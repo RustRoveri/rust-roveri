@@ -538,6 +538,7 @@ mod drone_test {
     use wg_2024::drone::Drone;
     use wg_2024::packet::Fragment;
     use wg_2024::packet::FRAGMENT_DSIZE;
+    use wg_2024::tests::*;
 
     #[test]
     fn test_initialization_1() {
@@ -1459,6 +1460,16 @@ mod drone_test {
         assert!(handle_1.join().is_ok(), "Drone 1 panicked");
         assert!(handle_2.join().is_ok(), "Drone 2 panicked");
         assert!(handle_3.join().is_ok(), "Drone 3 panicked");
+    }
+
+    #[test]
+    fn test_wg2024_generic_fragment_forward() {
+        generic_fragment_forward::<RustRoveri>()
+    }
+
+    #[test]
+    fn test_wg2024_generic_fragment_drop() {
+        generic_fragment_drop::<RustRoveri>()
     }
 
     // TODO: test flood response
