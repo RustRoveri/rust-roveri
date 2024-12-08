@@ -11,11 +11,14 @@ rust-roveri = { git = "ssh://git@github.com/RustRoveri/rust-roveri.git" }
 
 ## Features
 
-- Low memory usage (we avoid heap allocation on critical path when possible)
-- Extensive testing (each use-case is tested at least once)
 - Safety
   - Unchecked array indexing (`[...]`), `unwrap()` and `expect()` are never used
   - Every match expression is exhaustive and every if statement has an else branch
+- Blazingly fast (we avoid heap allocation on critical path when possible)
+- Low memory usage
+  - We use `BTreeSet` instead of `HashSet`
+  - We avoid using `clone()` when possible
+- Extensive testing (1000 lines of tests, each use-case is tested at least once)
 - Logging (we used the logging macro from the `log` crate)
 - Debuggability (useful messages in the case of protocol illegal states)
 
