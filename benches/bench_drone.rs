@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use rust_roveri::RustRoveri;
-use std::{collections::HashMap, hint::black_box, thread};
+use std::{collections::HashMap, hint::black_box, thread, time::Duration};
 use wg_2024::{
     controller::{DroneCommand, DroneEvent},
     drone::Drone,
@@ -78,11 +78,14 @@ fn bench_handle_fragment(c: &mut Criterion) {
         .send(DroneCommand::AddSender(RECEIVER_ID, receiver_tx))
         .expect("Cant add receiver to drone 1 neighbors");
 
-    c.bench_function("bench new", |b| {
+    c.bench_function("bench_handle_fragment", |b| {
         b.iter(|| {
             send_and_receive(packet.clone(), packet_send_tx.clone(), receiver_rx.clone());
         })
     });
+
+    thread::sleep(Duration::from_millis(1000));
+    let _ = controller_recv_tx.send(DroneCommand::Crash);
 
     let _ = handle.join();
 }
