@@ -12,9 +12,9 @@ use wg_2024::{
 fn bench_new(c: &mut Criterion) {
     let id: NodeId = 0;
     let pdr: f32 = 0.0;
-    let (controller_send_tx, controller_send_rx) = unbounded::<DroneEvent>();
-    let (controller_recv_tx, controller_recv_rx) = unbounded::<DroneCommand>();
-    let (packet_send_tx, packet_recv_rx) = unbounded::<Packet>();
+    let (controller_send_tx, _controller_send_rx) = unbounded::<DroneEvent>();
+    let (_controller_recv_tx, controller_recv_rx) = unbounded::<DroneCommand>();
+    let (_packet_send_tx, packet_recv_rx) = unbounded::<Packet>();
     let packet_send = HashMap::new();
 
     c.bench_function("bench_new", |b| {
@@ -37,8 +37,8 @@ fn send_and_receive(packet: Packet, packet_send: Sender<Packet>, packet_recv: Re
 }
 
 fn bench_handle_fragment(c: &mut Criterion) {
-    let DRONE_ID = 0;
-    let RECEIVER_ID = 1;
+    const DRONE_ID: NodeId = 0;
+    const RECEIVER_ID: NodeId = 1;
 
     let pdr: f32 = 0.0;
     let (controller_send_tx, _controller_send_rx) = unbounded::<DroneEvent>();
@@ -89,10 +89,6 @@ fn bench_handle_fragment(c: &mut Criterion) {
 
     let _ = handle.join();
 }
-
-//fn criterion_benchmark(c: &mut Criterion) {
-//    c.bench_function("bench new", |b| b.iter(|| fibonacci(black_box(20))));
-//}
 
 criterion_group!(benches, bench_new, bench_handle_fragment);
 criterion_main!(benches);

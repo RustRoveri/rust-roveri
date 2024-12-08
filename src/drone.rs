@@ -276,7 +276,7 @@ impl RustRoveri {
     }
 
     fn handle_ack(&self, ack: Ack, header: SourceRoutingHeader, session_id: u64) {
-        if let Err(_) = self.check_header(&header, 0) {
+        if self.check_header(&header, 0).is_err() {
             if header.hops.is_empty() {
                 let message = format!("{} Could not build Ack", self.get_prefix());
                 error!("{}", message);
@@ -305,9 +305,12 @@ impl RustRoveri {
     }
 
     fn handle_nack(&self, nack: Nack, header: SourceRoutingHeader, session_id: u64) {
-        if let Err(_) = self.check_header(&header, 0) {
+        if self.check_header(&header, 0).is_err() {
             if header.hops.is_empty() {
-                let message = format!("{} Could not build Nack (Nack header is empty)", self.get_prefix());
+                let message = format!(
+                    "{} Could not build Nack (Nack header is empty)",
+                    self.get_prefix()
+                );
                 error!("{}", message);
                 panic!("{}", message);
             } else {
