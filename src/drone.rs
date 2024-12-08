@@ -307,7 +307,7 @@ impl RustRoveri {
     fn handle_nack(&self, nack: Nack, header: SourceRoutingHeader, session_id: u64) {
         if let Err(_) = self.check_header(&header, 0) {
             if header.hops.is_empty() {
-                let message = format!("{} Could not build Nack", self.get_prefix());
+                let message = format!("{} Could not build Nack (Nack header is empty)", self.get_prefix());
                 error!("{}", message);
                 panic!("{}", message);
             } else {
@@ -412,7 +412,10 @@ impl RustRoveri {
                 }
                 Some(_) => self.send_drone_event(DroneEvent::ControllerShortcut(nack_packet)),
                 None => {
-                    let message = format!("{} Could not build Nack", self.get_prefix());
+                    let message = format!(
+                        "{} Could not build Nack (could not get previous hop)",
+                        self.get_prefix()
+                    );
                     error!("{}", message);
                     panic!("{}", message);
                 }
@@ -430,7 +433,10 @@ impl RustRoveri {
             };
             self.send_drone_event(DroneEvent::ControllerShortcut(nack_packet));
         } else {
-            let message = format!("{} Could not build Nack", self.get_prefix());
+            let message = format!(
+                "{} Could not build Nack (could not get packet sender)",
+                self.get_prefix()
+            );
             error!("{}", message);
             panic!("{}", message);
         }
