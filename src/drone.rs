@@ -455,7 +455,7 @@ impl RustRoveri {
         match self.get_sender(&packet) {
             Some(sender) => {
                 self.send_packet_to_sender(packet, sender);
-            },
+            }
             None => {
                 let message = format!("{} Could not reach neighbor", self.get_prefix());
                 error!("{}", message);
@@ -499,9 +499,7 @@ impl RustRoveri {
         self.packet_send
             .iter()
             .filter(|(&id, _)| id != node_id)
-            .map(|(_, sender)| {
-                sender
-            })
+            .map(|(_, sender)| sender)
             .collect()
     }
 
@@ -1542,10 +1540,7 @@ mod drone_test {
 
         // (1 -> 2)
         controller_recv_tx_1
-            .send(DroneCommand::AddSender(
-                DRONE_2_ID,
-                packet_recv_tx_2,
-            ))
+            .send(DroneCommand::AddSender(DRONE_2_ID, packet_recv_tx_2))
             .expect("Cant add drone 2 to drone 1 neighbors");
 
         // (2 -> 1)
@@ -1705,10 +1700,7 @@ mod drone_test {
 
         // (1 -> 2)
         controller_recv_tx_1
-            .send(DroneCommand::AddSender(
-                DRONE_2_ID,
-                packet_recv_tx_2,
-            ))
+            .send(DroneCommand::AddSender(DRONE_2_ID, packet_recv_tx_2))
             .expect("Cant add drone 2 to drone 1 neighbors");
 
         // (2 -> 1)
@@ -1721,10 +1713,7 @@ mod drone_test {
 
         // (1 -> 3)
         controller_recv_tx_1
-            .send(DroneCommand::AddSender(
-                DRONE_3_ID,
-                packet_recv_tx_3,
-            ))
+            .send(DroneCommand::AddSender(DRONE_3_ID, packet_recv_tx_3))
             .expect("Cant add drone 3 to drone 1 neighbors");
 
         // (3 -> 1)
