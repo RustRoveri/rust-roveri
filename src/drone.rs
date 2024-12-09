@@ -1906,6 +1906,4 @@ mod drone_test {
     fn test_wg2024_generic_chain_fragment_ack() {
         generic_chain_fragment_ack::<RustRoveri>();
     }
-
-    // TODO: test flood response
 }
