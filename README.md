@@ -18,7 +18,7 @@ rust-roveri = { git = "ssh://git@github.com/RustRoveri/rust-roveri.git" }
 - Low memory usage
   - We use `BTreeSet` instead of `HashSet`
   - We avoid using `clone()` when possible
-- Extensive testing (1000 lines of tests, each use-case is tested at least once)
+- Extensive testing (21 tests, around ~1300 lines, each use-case is tested at least once)
 - Logging (we used the logging macro from the `log` crate)
 - Debuggability (useful messages in the case of protocol illegal states)
 

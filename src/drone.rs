@@ -167,7 +167,6 @@ impl RustRoveri {
                 let adjacents = self.get_adjacents(previous);
 
                 if adjacents.is_empty() {
-                    println!("Drone {} is beginning flood res from flood req {}", self.id, req.clone());
                     self.begin_flood_response(req, session_id);
                 } else {
                     // Forward packet to neighbors
@@ -192,7 +191,6 @@ impl RustRoveri {
                     }
                 }
             } else {
-                println!("Drone {} is beginning flood res from flood req {}", self.id, req.clone());
                 // Flood request already received
                 self.begin_flood_response(req, session_id);
             }
@@ -501,7 +499,9 @@ impl RustRoveri {
         self.packet_send
             .iter()
             .filter(|(&id, _)| id != node_id)
-            .map(|(_, sender)| sender)
+            .map(|(_, sender)| {
+                sender
+            })
             .collect()
     }
 
@@ -1499,7 +1499,6 @@ mod drone_test {
 
         // Create receiver channels
         let (sender_recv_tx, sender_recv_rx) = unbounded::<Packet>();
-        let (sender_send_tx, sender_send_rx) = unbounded::<Packet>();
 
         // Create drone 1 channels
         let (controller_send_tx_1, controller_send_rx_1) = unbounded::<DroneEvent>();
@@ -1550,7 +1549,7 @@ mod drone_test {
             .expect("Cant add drone 2 to drone 1 neighbors");
 
         // (2 -> 1)
-        controller_recv_tx_1
+        controller_recv_tx_2
             .send(DroneCommand::AddSender(
                 DRONE_1_ID,
                 packet_recv_tx_1.clone(),
@@ -1580,6 +1579,15 @@ mod drone_test {
             .expect("Cant send packet to drone 1");
 
         // Assert
+        let assert_flood_request = |packet: Packet| match packet.pack_type {
+            PacketType::FloodRequest(flood_request) => {
+                assert_eq!(
+                    flood_request.flood_id, flood_request.flood_id,
+                    "Received flood request (flood_id) is changed after forwarding"
+                );
+            }
+            _ => panic!("Received Packet is not a FloodRequest"),
+        };
         let assert_flood_response = |packet: Packet| match packet.pack_type {
             PacketType::FloodResponse(flood_response) => {
                 assert_eq!(
@@ -1590,25 +1598,26 @@ mod drone_test {
             _ => panic!("Received Packet is not a FloodResponse"),
         };
 
-        let assert_packet_sent = |drone_event: DroneEvent| match drone_event {
+        let drone_event_1 = controller_send_rx_1
+            .recv_timeout(TIMEOUT)
+            .expect("Controller did not receive PacketSent event from drone 1");
+        match drone_event_1 {
+            DroneEvent::PacketSent(packet) => assert_flood_request(packet),
+            _ => panic!("Received DroneEvent is not a PacketSent"),
+        };
+
+        let drone_event_2 = controller_send_rx_2
+            .recv_timeout(TIMEOUT)
+            .expect("Controller did not receive PacketSent event from drone 2");
+        match drone_event_2 {
             DroneEvent::PacketSent(packet) => assert_flood_response(packet),
             _ => panic!("Received DroneEvent is not a PacketSent"),
         };
 
-        //let drone_event_1 = controller_send_rx_1
-        //    .recv_timeout(TIMEOUT)
-        //    .expect("Controller did not receive PacketSent event from drone 1");
-        //assert_packet_sent(drone_event_1);
-        //let drone_event_2 = controller_send_rx_2
-        //    .recv_timeout(TIMEOUT)
-        //    .expect("Controller did not receive PacketSent event from drone 2");
-        //assert_packet_sent(drone_event_2);
-
         let packet = sender_recv_rx
             .recv_timeout(TIMEOUT)
             .expect("Sender did not receive a packet");
-        panic!("SENDER RECEIVED: {}", packet);
-        //assert_flood_response(packet);
+        assert_flood_response(packet);
 
         // Crash the drones
         thread::sleep(Duration::from_millis(100));
@@ -1621,170 +1630,195 @@ mod drone_test {
 
     #[test]
     fn test_handle_flood_request_2() {
-        //// Topology:
-        ////             --- 2
-        ////            /
-        //// rx/tx --- 1
-        ////            \
-        ////             --- 3
-        //
-        //// Set parameters
-        //const SENDER_ID: NodeId = 70;
-        //const DRONE_1_ID: NodeId = 71;
-        //const DRONE_2_ID: NodeId = 72;
-        //const DRONE_3_ID: NodeId = 73;
-        //
-        //// Create sender channels
-        //let (sender_tx, _sender_rx) = unbounded::<Packet>();
-        //
-        //// Create receiver channels
-        //let (receiver_tx, receiver_rx) = unbounded::<Packet>();
-        //
-        //// Create drone 1 channels
-        //let (controller_1_send_tx, controller_1_send_rx) = unbounded::<DroneEvent>();
-        //let (controller_1_recv_tx, controller_1_recv_rx) = unbounded::<DroneCommand>();
-        //let (packet_1_send_tx, packet_1_recv_rx) = unbounded::<Packet>();
-        //let packet_send_1 = HashMap::new();
-        //
-        //// Spawn drone 1
-        //let mut drone_1 = RustRoveri::new(
-        //    DRONE_1_ID,
-        //    controller_1_send_tx,
-        //    controller_1_recv_rx,
-        //    packet_1_recv_rx,
-        //    packet_send_1,
-        //    0.0,
-        //);
-        //let handle_1 = thread::spawn(move || drone_1.run());
-        //
-        //// Create drone 2 channels
-        //let (controller_2_send_tx, controller_2_send_rx) = unbounded::<DroneEvent>();
-        //let (controller_2_recv_tx, controller_2_recv_rx) = unbounded::<DroneCommand>();
-        //let (packet_2_send_tx, packet_2_recv_rx) = unbounded::<Packet>();
-        //let packet_send_2 = HashMap::new();
-        //
-        //// Spawn drone 2
-        //let mut drone_2 = RustRoveri::new(
-        //    DRONE_2_ID,
-        //    controller_2_send_tx,
-        //    controller_2_recv_rx,
-        //    packet_2_recv_rx,
-        //    packet_send_2,
-        //    0.0,
-        //);
-        //let handle_2 = thread::spawn(move || drone_2.run());
-        //
-        //// Create drone 3 channels
-        //let (controller_3_send_tx, controller_3_send_rx) = unbounded::<DroneEvent>();
-        //let (controller_3_recv_tx, controller_3_recv_rx) = unbounded::<DroneCommand>();
-        //let (packet_3_send_tx, packet_3_recv_rx) = unbounded::<Packet>();
-        //let packet_send_3 = HashMap::new();
-        //
-        //// Spawn drone 3
-        //let mut drone_3 = RustRoveri::new(
-        //    DRONE_3_ID,
-        //    controller_3_send_tx,
-        //    controller_3_recv_rx,
-        //    packet_3_recv_rx,
-        //    packet_send_3,
-        //    0.0,
-        //);
-        //let handle_3 = thread::spawn(move || drone_3.run());
-        //
-        //// Add senders to simulate the network
-        //controller_1_recv_tx
-        //    .send(DroneCommand::AddSender(SENDER_ID, sender_tx))
-        //    .expect("Cant add sender to drone 1 neighbors");
-        //
-        //controller_1_recv_tx
-        //    .send(DroneCommand::AddSender(
-        //        DRONE_2_ID,
-        //        packet_2_send_tx.clone(),
-        //    ))
-        //    .expect("Cant add drone 2 to drone 1 neighbors");
-        //
-        //controller_1_recv_tx
-        //    .send(DroneCommand::AddSender(DRONE_3_ID, packet_3_send_tx))
-        //    .expect("Cant add drone 3 to drone 1 neighbors");
-        //
-        //controller_2_recv_tx
-        //    .send(DroneCommand::AddSender(
-        //        DRONE_1_ID,
-        //        packet_1_send_tx.clone(),
-        //    ))
-        //    .expect("Cant add drone 1 to drone 2 neighbors");
-        //
-        //controller_3_recv_tx
-        //    .send(DroneCommand::AddSender(DRONE_1_ID, packet_2_send_tx))
-        //    .expect("Cant add drone 1 to drone 3 neighbors");
-        //
-        //// Create fragment
-        //let flood_request = FloodRequest {
-        //    flood_id: 0,
-        //    initiator_id: SENDER_ID,
-        //    path_trace: vec![(SENDER_ID, NodeType::Client)],
-        //};
-        //
-        //// Create packet
-        //let packet = Packet {
-        //    pack_type: PacketType::FloodRequest(flood_request.clone()),
-        //    routing_header: SourceRoutingHeader {
-        //        hops: vec![],
-        //        hop_index: 0,
-        //    },
-        //    session_id: 0,
-        //};
-        //
-        //// Send packet to drone 1
-        //packet_1_send_tx
-        //    .send(packet)
-        //    .expect("Cant send packet to drone 1");
-        //
-        ////// Crash the drones
-        ////thread::sleep(Duration::from_millis(100));
-        ////let _ = controller_1_recv_tx.send(DroneCommand::Crash);
-        ////let _ = controller_2_recv_tx.send(DroneCommand::Crash);
-        ////let _ = controller_3_recv_tx.send(DroneCommand::Crash);
-        ////
-        ////// Assert
-        ////let assert_flood_response = |packet: Packet| match packet.pack_type {
-        ////    PacketType::FloodResponse(flood_response) => {
-        ////        assert_eq!(
-        ////            flood_request.flood_id, flood_response.flood_id,
-        ////            "Received flood response (flood_id) is changed after forwarding"
-        ////        );
-        ////    }
-        ////    _ => panic!("Received Packet is not a FloodResponse"),
-        ////};
-        ////
-        ////let assert_packet_sent = |drone_event: DroneEvent| match drone_event {
-        ////    DroneEvent::PacketSent(packet) => assert_flood_response(packet),
-        ////    _ => panic!("Received DroneEvent is not a PacketSent"),
-        ////};
-        //
-        ////let drone_event_1 = controller_1_send_rx
-        ////    .recv_timeout(TIMEOUT)
-        ////    .expect("Controller did not receive PacketSent event from drone 1");
-        ////assert_packet_sent(drone_event_1);
-        ////let drone_event_2 = controller_2_send_rx
-        ////    .recv_timeout(TIMEOUT)
-        ////    .expect("Controller did not receive PacketSent event from drone 2");
-        ////assert_packet_sent(drone_event_2);
-        ////
-        ////let drone_event_3 = controller_3_send_rx
-        ////    .recv_timeout(TIMEOUT)
-        ////    .expect("Controller did not receive PacketSent event from drone 3");
-        ////assert_packet_sent(drone_event_3);
-        //
-        ////let packet = receiver_rx
-        ////    .recv_timeout(TIMEOUT)
-        ////    .expect("Receiver did not receive a packet");
-        ////println!("{}", packet);
-        ////assert_flood_response(packet);
-        //
-        //assert!(handle_1.join().is_ok(), "Drone 1 panicked");
-        //assert!(handle_2.join().is_ok(), "Drone 2 panicked");
-        //assert!(handle_3.join().is_ok(), "Drone 3 panicked");
+        // Topology:
+        //             --- 2
+        //            /
+        // rx/tx --- 1
+        //            \
+        //             --- 3
+
+        // Set parameters
+        const SENDER_ID: NodeId = 70;
+        const DRONE_1_ID: NodeId = 71;
+        const DRONE_2_ID: NodeId = 72;
+        const DRONE_3_ID: NodeId = 73;
+
+        // Create receiver channels
+        let (sender_recv_tx, sender_recv_rx) = unbounded::<Packet>();
+
+        // Create drone 1 channels
+        let (controller_send_tx_1, controller_send_rx_1) = unbounded::<DroneEvent>();
+        let (controller_recv_tx_1, controller_recv_rx_1) = unbounded::<DroneCommand>();
+        let (packet_recv_tx_1, packet_recv_rx_1) = unbounded::<Packet>();
+        let packet_send_1 = HashMap::new();
+
+        // Spawn drone 1
+        let mut drone_1 = RustRoveri::new(
+            DRONE_1_ID,
+            controller_send_tx_1,
+            controller_recv_rx_1,
+            packet_recv_rx_1.clone(),
+            packet_send_1,
+            0.0,
+        );
+        let handle_1 = thread::spawn(move || drone_1.run());
+
+        // Create drone 2 channels
+        let (controller_send_tx_2, controller_send_rx_2) = unbounded::<DroneEvent>();
+        let (controller_recv_tx_2, controller_recv_rx_2) = unbounded::<DroneCommand>();
+        let (packet_recv_tx_2, packet_recv_rx_2) = unbounded::<Packet>();
+        let packet_send_2 = HashMap::new();
+
+        // Spawn drone 2
+        let mut drone_2 = RustRoveri::new(
+            DRONE_2_ID,
+            controller_send_tx_2,
+            controller_recv_rx_2,
+            packet_recv_rx_2,
+            packet_send_2,
+            0.0,
+        );
+        let handle_2 = thread::spawn(move || drone_2.run());
+
+        // Create drone 3 channels
+        let (controller_send_tx_3, controller_send_rx_3) = unbounded::<DroneEvent>();
+        let (controller_recv_tx_3, controller_recv_rx_3) = unbounded::<DroneCommand>();
+        let (packet_recv_tx_3, packet_recv_rx_3) = unbounded::<Packet>();
+        let packet_send_3 = HashMap::new();
+
+        // Spawn drone 3
+        let mut drone_3 = RustRoveri::new(
+            DRONE_3_ID,
+            controller_send_tx_3,
+            controller_recv_rx_3,
+            packet_recv_rx_3,
+            packet_send_3,
+            0.0,
+        );
+        let handle_3 = thread::spawn(move || drone_3.run());
+
+        // Add senders to simulate the network
+        // (sender <- 1)
+        controller_recv_tx_1
+            .send(DroneCommand::AddSender(SENDER_ID, sender_recv_tx))
+            .expect("Cant add sender to drone 1 neighbors");
+
+        // (1 -> 2)
+        controller_recv_tx_1
+            .send(DroneCommand::AddSender(
+                DRONE_2_ID,
+                packet_recv_tx_2,
+            ))
+            .expect("Cant add drone 2 to drone 1 neighbors");
+
+        // (2 -> 1)
+        controller_recv_tx_2
+            .send(DroneCommand::AddSender(
+                DRONE_1_ID,
+                packet_recv_tx_1.clone(),
+            ))
+            .expect("Cant add drone 1 to drone 2 neighbors");
+
+        // (1 -> 3)
+        controller_recv_tx_1
+            .send(DroneCommand::AddSender(
+                DRONE_3_ID,
+                packet_recv_tx_3,
+            ))
+            .expect("Cant add drone 3 to drone 1 neighbors");
+
+        // (3 -> 1)
+        controller_recv_tx_3
+            .send(DroneCommand::AddSender(
+                DRONE_1_ID,
+                packet_recv_tx_1.clone(),
+            ))
+            .expect("Cant add drone 1 to drone 3 neighbors");
+
+        // Create flood request
+        let flood_request = FloodRequest {
+            flood_id: 0,
+            initiator_id: SENDER_ID,
+            path_trace: vec![(SENDER_ID, NodeType::Client)],
+        };
+
+        // Create packet
+        let packet = Packet {
+            pack_type: PacketType::FloodRequest(flood_request.clone()),
+            routing_header: SourceRoutingHeader {
+                hops: vec![],
+                hop_index: 0,
+            },
+            session_id: 0,
+        };
+
+        // Send packet to drone 1
+        packet_recv_tx_1
+            .send(packet)
+            .expect("Cant send packet to drone 1");
+
+        // Assert
+        let assert_flood_request = |packet: Packet| match packet.pack_type {
+            PacketType::FloodRequest(flood_request) => {
+                assert_eq!(
+                    flood_request.flood_id, flood_request.flood_id,
+                    "Received flood request (flood_id) is changed after forwarding"
+                );
+            }
+            _ => panic!("Received Packet is not a FloodRequest"),
+        };
+        let assert_flood_response = |packet: Packet| match packet.pack_type {
+            PacketType::FloodResponse(flood_response) => {
+                assert_eq!(
+                    flood_request.flood_id, flood_response.flood_id,
+                    "Received flood response (flood_id) is changed after forwarding"
+                );
+            }
+            _ => panic!("Received Packet is not a FloodResponse"),
+        };
+
+        let drone_event_1 = controller_send_rx_1
+            .recv_timeout(TIMEOUT)
+            .expect("Controller did not receive PacketSent event from drone 1");
+        match drone_event_1 {
+            DroneEvent::PacketSent(packet) => assert_flood_request(packet),
+            _ => panic!("Received DroneEvent is not a PacketSent"),
+        };
+
+        let drone_event_2 = controller_send_rx_2
+            .recv_timeout(TIMEOUT)
+            .expect("Controller did not receive PacketSent event from drone 2");
+        match drone_event_2 {
+            DroneEvent::PacketSent(packet) => assert_flood_response(packet),
+            _ => panic!("Received DroneEvent is not a PacketSent"),
+        };
+
+        let drone_event_3 = controller_send_rx_3
+            .recv_timeout(TIMEOUT)
+            .expect("Controller did not receive PacketSent event from drone 3");
+        match drone_event_3 {
+            DroneEvent::PacketSent(packet) => assert_flood_response(packet),
+            _ => panic!("Received DroneEvent is not a PacketSent"),
+        };
+
+        let packet = sender_recv_rx
+            .recv_timeout(TIMEOUT)
+            .expect("Sender did not receive a packet");
+        assert_flood_response(packet);
+        let packet = sender_recv_rx
+            .recv_timeout(TIMEOUT)
+            .expect("Sender did not receive a packet");
+        assert_flood_response(packet);
+
+        // Crash the drones
+        thread::sleep(Duration::from_millis(100));
+        let _ = controller_recv_tx_1.send(DroneCommand::Crash);
+        let _ = controller_recv_tx_2.send(DroneCommand::Crash);
+        let _ = controller_recv_tx_3.send(DroneCommand::Crash);
+
+        assert!(handle_1.join().is_ok(), "Drone 1 panicked");
+        assert!(handle_2.join().is_ok(), "Drone 2 panicked");
+        assert!(handle_3.join().is_ok(), "Drone 3 panicked");
     }
 
     #[test]
