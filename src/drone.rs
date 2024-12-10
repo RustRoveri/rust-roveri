@@ -164,7 +164,7 @@ impl RustRoveri {
             if self.flood_ids.insert((previous, req.flood_id)) {
                 // Flood request not yet received
                 // Get adjacent nodes (but the node that sent us the request)
-                let adjacents = self.get_adjacents(previous);
+                let adjacents = self.get_adjacents_but(previous);
 
                 if adjacents.is_empty() {
                     self.begin_flood_response(req, session_id);
@@ -495,7 +495,7 @@ impl RustRoveri {
         }));
     }
 
-    fn get_adjacents(&self, node_id: NodeId) -> Vec<&Sender<Packet>> {
+    fn get_adjacents_but(&self, node_id: NodeId) -> Vec<&Sender<Packet>> {
         self.packet_send
             .iter()
             .filter(|(&id, _)| id != node_id)
@@ -1873,8 +1873,8 @@ mod drone_test {
         // Client listens for packet from the drone (Dropped Nack)
         assert_eq!(c_recv.recv_timeout(TIMEOUT).unwrap(), nack_packet);
         // ADDITIONAL
-        // (Since our drone first sends the Nack packet and the PacketSent
-        // event and then sends the PacketDropped event
+        // (Since our drone first sends the Nack packet, then
+        // the PacketSent event and finally PacketDropped event)
         assert_eq!(
             d_event_recv.recv_timeout(TIMEOUT).unwrap(),
             DroneEvent::PacketSent(nack_packet)
