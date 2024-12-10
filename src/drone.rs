@@ -72,10 +72,10 @@ impl RustRoveri {
 
     fn set_packet_drop_rate(&mut self, pdr: f32) {
         if (0.0..=1.0).contains(&pdr) {
-            println!("Packet drop rate set to {}", pdr);
+            info!("Packet drop rate set to {}", pdr);
             self.pdr = pdr;
         } else {
-            println!(
+            error!(
                 "Tried to set packet drop rate to {} which is not inside the allowed bounds",
                 pdr
             );
@@ -84,23 +84,23 @@ impl RustRoveri {
 
     fn add_sender(&mut self, node_id: NodeId, sender: Sender<Packet>) {
         match self.packet_send.insert(node_id, sender) {
-            Some(_) => println!("Neighbor {} updated", node_id),
-            None => println!("Neighbor {} added", node_id),
+            Some(_) => info!("Neighbor {} updated", node_id),
+            None => info!("Neighbor {} added", node_id),
         }
     }
 
     fn crash(&mut self) {
-        println!("Crashing drone {}...", self.id);
+        info!("Crashing drone {}...", self.id);
         self.should_terminate = true;
     }
 
     fn remove_sender(&mut self, node_id: NodeId) {
         match self.packet_send.remove(&node_id) {
             Some(_) => {
-                println!("Removed node {} from neighbors", node_id);
+                info!("Removed node {} from neighbors", node_id);
             }
             None => {
-                println!(
+                error!(
                     "Tried to remove node {} from neighbors, but no such node is present",
                     node_id,
                 );
