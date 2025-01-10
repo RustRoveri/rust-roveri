@@ -23,7 +23,7 @@ pub struct RustRoveri {
 }
 
 impl Drone for RustRoveri {
-    pub fn new(
+    fn new(
         id: NodeId,
         controller_send: Sender<DroneEvent>,
         controller_recv: Receiver<DroneCommand>,
@@ -43,7 +43,7 @@ impl Drone for RustRoveri {
         }
     }
 
-    pub fn run(&mut self) {
+    fn run(&mut self) {
         while !self.should_terminate {
             select_biased! {
                 recv(self.controller_recv) -> command => {
