@@ -139,7 +139,7 @@ impl RustRoveri {
                 ..header
             };
 
-            println!("[DRONE {}]: Forwarding fragment {} of {}", self.id, fragment.fragment_index, fragment.total_n_fragments);
+            info!("[DRONE {}]: Forwarding fragment {} of {}", self.id, fragment.fragment_index, fragment.total_n_fragments);
 
             let msg_packet = Packet {
                 pack_type: PacketType::MsgFragment(fragment),
