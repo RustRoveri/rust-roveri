@@ -169,49 +169,45 @@ impl RustRoveri {
         // - The drone adds itself to the path_trace
         // - The drone creates a FloodResponse and sends it back
         // Otherwise
-        // - The drone forwards the flood request to neighbors except the sender of the flood
+        // - The drone forwards the flood request to neighbors except the sender
+        // of the flood
         // request
-        if let Some(&(previous, _)) = req.path_trace.last() {
-            if self.flood_ids.insert((previous, req.flood_id)) {
-                // Flood request not yet received
-                // Get adjacent nodes (but the node that sent us the request)
-                let adjacents = self.get_adjacents_but(previous);
-
-                if adjacents.is_empty() {
-                    self.begin_flood_response(req, session_id);
-                } else {
-                    // Forward packet to neighbors
-                    let flood_req = FloodRequest {
-                        flood_id: req.flood_id,
-                        initiator_id: req.initiator_id,
-                        path_trace: {
-                            let mut trace = req.path_trace;
-                            trace.push((self.id, NodeType::Drone));
-                            trace
-                        },
-                    };
-
-                    let flood_req_packet = Packet {
-                        routing_header: header,
-                        pack_type: PacketType::FloodRequest(flood_req),
-                        session_id,
-                    };
-
-                    for sender in adjacents {
-                        self.send_packet_to_sender(flood_req_packet.clone(), sender);
-                    }
-                }
+        if self.flood_ids.insert((req.initiator_id, req.flood_id)) {
+            // Flood request not yet received
+            // Get adjacent nodes (but the node that sent us the request)
+            let adjacents = if let Some(&(previous, _)) = req.path_trace.last() {
+                self.get_adjacents_but(previous)
             } else {
-                // Flood request already received
+                self.get_adjacents()
+            };
+
+            if adjacents.is_empty() {
                 self.begin_flood_response(req, session_id);
+            } else {
+                // Forward packet to neighbors
+                let flood_req = FloodRequest {
+                    flood_id: req.flood_id,
+                    initiator_id: req.initiator_id,
+                    path_trace: {
+                        let mut trace = req.path_trace;
+                        trace.push((self.id, NodeType::Drone));
+                        trace
+                    },
+                };
+
+                let flood_req_packet = Packet {
+                    routing_header: header,
+                    pack_type: PacketType::FloodRequest(flood_req),
+                    session_id,
+                };
+
+                for sender in adjacents {
+                    self.send_packet_to_sender(flood_req_packet.clone(), sender);
+                }
             }
         } else {
-            let message = format!(
-                "{} The flood request path trace is empty",
-                self.get_prefix()
-            );
-            error!("{}", message);
-            panic!("{}", message);
+            // Flood request already received
+            self.begin_flood_response(req, session_id);
         }
     }
 
@@ -517,6 +513,13 @@ impl RustRoveri {
             routing_header,
             session_id,
         }));
+    }
+
+    fn get_adjacents(&self) -> Vec<&Sender<Packet>> {
+        self.packet_send
+            .iter()
+            .map(|(_, sender)| sender)
+            .collect()
     }
 
     fn get_adjacents_but(&self, node_id: NodeId) -> Vec<&Sender<Packet>> {
@@ -866,7 +869,7 @@ mod drone_test {
         let _ = controller_recv_tx.send(DroneCommand::Crash);
 
         // Assert
-        assert!(handle.join().is_err(), "Drone didn't panic");
+        assert!(handle.join().is_ok(), "Drone panicked");
     }
 
     #[test]
