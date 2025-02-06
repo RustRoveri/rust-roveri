@@ -129,8 +129,13 @@ impl RustRoveri {
         }
     }
 
-    fn handle_fragment(&self, fragment: Fragment, header: SourceRoutingHeader, session_id: u64) {
-        if let Err(nack) = self.check_fragment(&header, &fragment) {
+    fn handle_fragment(
+        &self,
+        fragment: Fragment,
+        mut header: SourceRoutingHeader,
+        session_id: u64,
+    ) {
+        if let Err(nack) = self.check_fragment(&mut header, &fragment) {
             self.send_nack(nack, &header, session_id);
             self.send_drop_event(PacketType::MsgFragment(fragment), header, session_id);
         } else {
@@ -139,7 +144,10 @@ impl RustRoveri {
                 ..header
             };
 
-            info!("[DRONE {}]: Forwarding fragment {} of {}", self.id, fragment.fragment_index, fragment.total_n_fragments);
+            info!(
+                "[DRONE {}]: Forwarding fragment {} of {}",
+                self.id, fragment.fragment_index, fragment.total_n_fragments
+            );
 
             let msg_packet = Packet {
                 pack_type: PacketType::MsgFragment(fragment),
@@ -217,15 +225,23 @@ impl RustRoveri {
             },
         };
 
+        let mut hops: Vec<NodeId> = flood_res
+            .path_trace
+            .iter()
+            .map(|(id, _)| *id)
+            .rev()
+            .collect();
+
+        if let Some(last) = hops.last() {
+            if *last != req.initiator_id {
+                hops.push(req.initiator_id);
+            }
+        }
+
         let flood_res_packet = Packet {
             routing_header: SourceRoutingHeader {
                 hop_index: 1,
-                hops: flood_res
-                    .path_trace
-                    .iter()
-                    .map(|(id, _)| *id)
-                    .rev()
-                    .collect(),
+                hops,
             },
             pack_type: PacketType::FloodResponse(flood_res),
             session_id,
@@ -247,10 +263,10 @@ impl RustRoveri {
     fn handle_flood_response(
         &self,
         res: FloodResponse,
-        header: SourceRoutingHeader,
+        mut header: SourceRoutingHeader,
         session_id: u64,
     ) {
-        if let Err(nack) = self.check_header(&header, 0) {
+        if let Err(nack) = self.check_sanitize_header(&mut header, 0) {
             self.send_nack(nack, &header, session_id);
             self.send_drop_event(PacketType::FloodResponse(res), header, session_id);
         } else {
@@ -278,8 +294,8 @@ impl RustRoveri {
         }
     }
 
-    fn handle_ack(&self, ack: Ack, header: SourceRoutingHeader, session_id: u64) {
-        if self.check_header(&header, 0).is_err() {
+    fn handle_ack(&self, ack: Ack, mut header: SourceRoutingHeader, session_id: u64) {
+        if self.check_sanitize_header(&mut header, 0).is_err() {
             if header.hops.is_empty() {
                 let message = format!("{} Could not build Ack", self.get_prefix());
                 error!("{}", message);
@@ -307,8 +323,8 @@ impl RustRoveri {
         }
     }
 
-    fn handle_nack(&self, nack: Nack, header: SourceRoutingHeader, session_id: u64) {
-        if self.check_header(&header, 0).is_err() {
+    fn handle_nack(&self, nack: Nack, mut header: SourceRoutingHeader, session_id: u64) {
+        if self.check_sanitize_header(&mut header, 0).is_err() {
             if header.hops.is_empty() {
                 let message = format!(
                     "{} Could not build Nack (Nack header is empty)",
@@ -341,11 +357,11 @@ impl RustRoveri {
 
     fn check_fragment(
         &self,
-        header: &SourceRoutingHeader,
+        header: &mut SourceRoutingHeader,
         fragment: &Fragment,
     ) -> Result<(), Nack> {
         let fragment_index = fragment.fragment_index;
-        self.check_header(header, fragment_index)?;
+        self.check_sanitize_header(header, fragment_index)?;
 
         // Step 5: Determine whether to drop the packet based on the drone's Packet Drop Rate (PDR)
         if random::<f32>() <= self.pdr {
@@ -359,14 +375,19 @@ impl RustRoveri {
         }
     }
 
-    fn check_header(&self, header: &SourceRoutingHeader, fragment_index: u64) -> Result<(), Nack> {
+    fn check_sanitize_header(
+        &self,
+        header: &mut SourceRoutingHeader,
+        fragment_index: u64,
+    ) -> Result<(), Nack> {
         // Step 1: Check if hops[hop_index] matches the drone's own NodeId
-        match header.hops.get(header.hop_index) {
-            Some(&id) if id != self.id => {
+        match header.hops.get_mut(header.hop_index) {
+            Some(id) if *id != self.id => {
                 let nack = Nack {
                     fragment_index,
-                    nack_type: NackType::UnexpectedRecipient(id),
+                    nack_type: NackType::UnexpectedRecipient(self.id),
                 };
+                *id = self.id;
                 return Err(nack);
             }
             Some(_) => {}
@@ -937,11 +958,11 @@ mod drone_test {
     }
 
     #[test]
-    fn test_check_header_unexpected_recipient() {
+    fn test_check_sanitize_header_unexpected_recipient() {
         // Set parameters
-        const DRONE_ID: NodeId = 0;
-        const SENDER_ID: NodeId = 69;
-        const WRONG_DRONE_ID: NodeId = 70;
+        const SENDER_ID: NodeId = 70;
+        const DRONE_ID: NodeId = 71;
+        const WRONG_DRONE_ID: NodeId = 72;
 
         // Create channels
         let (controller_send_tx, _controller_send_rx) = unbounded::<DroneEvent>();
@@ -992,16 +1013,13 @@ mod drone_test {
         // Assert
         assert_eq!(
             nack_packet.routing_header.hops,
-            vec![WRONG_DRONE_ID, SENDER_ID],
+            vec![DRONE_ID, SENDER_ID],
             "Nack routing header is not as expected",
         );
         match nack_packet.pack_type {
             PacketType::Nack(nack) => match nack.nack_type {
-                NackType::UnexpectedRecipient(WRONG_DRONE_ID) => {}
-                _ => panic!(
-                    "Received Nack is not UnexpectedReceipient({})",
-                    WRONG_DRONE_ID
-                ),
+                NackType::UnexpectedRecipient(DRONE_ID) => {}
+                _ => panic!("Received Nack is not UnexpectedReceipient({})", DRONE_ID),
             },
             _ => panic!("Received Packet is not a Nack"),
         }
@@ -1009,7 +1027,7 @@ mod drone_test {
     }
 
     #[test]
-    fn test_check_header_error_in_routing_1() {
+    fn test_check_sanitize_header_error_in_routing_1() {
         // Set parameters
         const SENDER_ID: NodeId = 1;
         const DRONE_ID: NodeId = 2;
@@ -1076,7 +1094,7 @@ mod drone_test {
     }
 
     #[test]
-    fn test_check_header_error_in_routing_2() {
+    fn test_check_sanitize_header_error_in_routing_2() {
         // Set parameters
         const DRONE_ID: NodeId = 0;
         const SENDER_ID: NodeId = 69;
@@ -1147,7 +1165,7 @@ mod drone_test {
     }
 
     #[test]
-    fn test_check_header_destination_is_drone() {
+    fn test_check_sanitize_header_destination_is_drone() {
         // Set parameters
         const DRONE_ID: NodeId = 34;
         const SENDER_ID: NodeId = 35;
